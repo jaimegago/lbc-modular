@@ -15,11 +15,7 @@ type ReqData struct {
 	HitCount int
 }
 
-type Stats struct {
-	ReqParamsHits []ReqData
-}
-
-func (req *ReqData) Create() error {
+func (req *ReqData) Get() error {
 
 	results := []string{}
 	for i := 0; i <= req.Limit; i++ {
@@ -38,47 +34,9 @@ func (req *ReqData) Create() error {
 }
 
 func (fb *ReqData) Validate() error {
-	// validate fb params according to the fizzbuzz game logic rules
+	// Here we would validate fb params according to the fizzbuzz game logic rules
 	// e.g. str1 and str2 != ""
+	// (done in previous "non modular" version)
 	log.Println("INFO: params we got that we would validate:", fb)
 	return nil
-}
-
-func (st Stats) CountReqParamsHit(req ReqData) {
-	log.Println("DEBUG: Enter stats count")
-	if len(st.ReqParamsHits) == 0 {
-		st.ReqParamsHits = []ReqData{
-			{
-				Int1:     req.Int1,
-				Int2:     req.Int2,
-				Limit:    req.Limit,
-				Str1:     req.Str1,
-				Str2:     req.Str2,
-				HitCount: 1,
-			},
-		}
-	}
-	for i, reqStat := range st.ReqParamsHits {
-		log.Println("DEBUG: enter stat range")
-		if req.Int1 == reqStat.Int1 &&
-			req.Int2 == reqStat.Int2 &&
-			req.Limit == reqStat.Limit &&
-			req.Str1 == reqStat.Str1 &&
-			req.Str2 == reqStat.Str2 {
-			st.ReqParamsHits[i].HitCount++
-			log.Println("DEBUG: fb stats:", req)
-			return
-		}
-		log.Println("DEBUG: stats not found")
-		st.ReqParamsHits = append(st.ReqParamsHits,
-			ReqData{
-				Int1:     req.Int1,
-				Int2:     req.Int2,
-				Limit:    req.Limit,
-				Str1:     req.Str1,
-				Str2:     req.Str2,
-				HitCount: 1,
-			})
-		log.Println("DEBUG: fb stats:", req)
-	}
 }

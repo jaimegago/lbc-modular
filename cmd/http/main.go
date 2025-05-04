@@ -7,14 +7,17 @@ import (
 	"net/http"
 
 	fb "github.com/jaimegago/lbc-modular/pkg/fizzbuzz"
+	"github.com/jaimegago/lbc-modular/pkg/memstore"
 )
 
-type fbHandler struct{}
+type fbHandler struct {
+	store statStore
+}
 
 func (h *fbHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.RequestURI == "/fizzbuzz" && r.Method == http.MethodPost:
-		h.CreateFbResults(w, r)
+		h.GetFbResults(w, r)
 	case r.RequestURI == "/fizzbuzz-stats":
 		h.GetFbStats(w, r)
 	default:
@@ -22,7 +25,7 @@ func (h *fbHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *fbHandler) CreateFbResults(w http.ResponseWriter, r *http.Request) {
+func (h *fbHandler) GetFbResults(w http.ResponseWriter, r *http.Request) {
 	var fbReq fb.ReqData
 	// TODO move json decode to its own func
 	err := json.NewDecoder(r.Body).Decode(&fbReq)
@@ -31,18 +34,27 @@ func (h *fbHandler) CreateFbResults(w http.ResponseWriter, r *http.Request) {
 		InternalServerErrorHandler(w, r)
 		return
 	}
+
+	// params validation
 	err = fbReq.Validate()
 	if err != nil {
 		InternalServerErrorHandler(w, r)
 		return
 	}
-	// Get stats from storage
-	var stats fb.Stats
-	stats.ReqParamsHits = []fb.ReqData{}
-	stats.CountReqParamsHit(fbReq)
-	log.Println("INFO: stats after count: ", stats)
-	err = fbReq.Create()
 
+	// params stats count
+	stats, err := h.store.GetStats()
+	if err != nil {
+		log.Println("ERROR: failed to get stats from store ", err)
+	}
+	updatedStats := fbReq.CountReqParamsHit(stats)
+	err = h.store.UpdateStats(updatedStats)
+	if err != nil {
+		log.Println("ERROR: failed to update stats", err)
+	}
+
+	// finaly results
+	err = fbReq.Get()
 	if err != nil {
 		log.Println("ERROR: failed to create results", err)
 		InternalServerErrorHandler(w, r)
@@ -52,7 +64,23 @@ func (h *fbHandler) CreateFbResults(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *fbHandler) GetFbStats(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("this is fb stats"))
+	stats, err := h.store.GetStats()
+	if err != nil {
+		log.Println("ERROR: failed to get stats", err)
+	}
+	sendJson(w, fb.GetHighestHitCount(stats))
+}
+
+type statStore interface {
+	// The error return is for "real" stores (not my "fake" memstore)
+	GetStats() ([]fb.ReqData, error)
+	UpdateStats([]fb.ReqData) error
+}
+
+func NewFbHandler(s statStore) *fbHandler {
+	return &fbHandler{
+		store: s,
+	}
 }
 
 func (h *fbHandler) Default(w http.ResponseWriter, r *http.Request) {
@@ -78,11 +106,13 @@ func sendJson(w http.ResponseWriter, v any) {
 }
 
 func main() {
+	store := memstore.New()
+	fbHandler := NewFbHandler(store)
 
 	mux := http.NewServeMux()
 
-	mux.Handle("/fizzbuzz", &fbHandler{})
-	mux.Handle("/fizzbuzz-stats", &fbHandler{})
+	mux.Handle("/fizzbuzz", fbHandler)
+	mux.Handle("/fizzbuzz-stats", fbHandler)
 
 	http.ListenAndServe(":8080", mux)
 }

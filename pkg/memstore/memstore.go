@@ -5,13 +5,18 @@ import (
 )
 
 type MemStore struct {
-	stats map[*fb.ReqData]int
+	stats []fb.ReqData
 }
 
-func NewMemStore() *MemStore {
-	return &MemStore{stats: map[*fb.ReqData]int{}}
+func New() *MemStore {
+	return &MemStore{stats: []fb.ReqData{}}
 }
 
-func (m MemStore) Update(*fb.ReqData) {
+func (m *MemStore) UpdateStats(stats []fb.ReqData) error {
+	m.stats = stats
+	return nil
+}
 
+func (m MemStore) GetStats() ([]fb.ReqData, error) {
+	return m.stats, nil
 }
